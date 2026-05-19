@@ -1,0 +1,25 @@
+- name: regression/issue_1132__reset_connection_no_context.yml
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Add an unreachable Mitogen SSH host
+      add_host:
+        name: issue-1132-no-context
+        ansible_connection: mitogen_ssh
+        ansible_host: 192.0.2.1
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_ssh_common_args: -o ConnectTimeout=1 -o ConnectionAttempts=1
+        ansible_timeout: 1
+        ansible_user: root
+  tags:
+    - issue_1132
+
+- name: regression/issue_1132__reset_connection_no_context.yml
+  hosts: issue-1132-no-context
+  gather_facts: false
+  tasks:
+    - include_tasks: _mitogen_only.yml
+
+    - meta: reset_connection
+  tags:
+    - issue_1132

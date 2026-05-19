@@ -989,29 +989,38 @@ class Connection(ansible.plugins.connection.ConnectionBase):
             del task
             del templar
 
+        had_context = self.context is not None
+
         # Clear out state in case we were ever connected.
         self.close()
 
-        inventory_name, stack = self._build_stack()
-        if self.become:
-            stack = stack[:-1]
-
-        worker_model = ansible_mitogen.process.get_worker_model()
-        binding = worker_model.get_binding(inventory_name)
         try:
-            mitogen.service.call(
-                call_context=binding.get_service_context(),
-                service_name='ansible_mitogen.services.ContextService',
-                method_name='reset',
-                stack=ansible_mitogen.utils.unsafe.cast(list(stack)),
-            )
-        finally:
-            binding.close()
+            # Vanilla Ansible treats reset_connection without an existing
+            # connection as a no-op. Avoid building a Mitogen stack here, since
+            # that may trigger interpreter discovery and open a new SSH session.
+            if not had_context:
+                return
 
-        # Cleanup any monkey patching we did for `meta: reset_connection`
-        if self._action_monkey_patched_by_mitogen:
-            del self._action
-        del self._action_monkey_patched_by_mitogen
+            inventory_name, stack = self._build_stack()
+            if self.become:
+                stack = stack[:-1]
+
+            worker_model = ansible_mitogen.process.get_worker_model()
+            binding = worker_model.get_binding(inventory_name)
+            try:
+                mitogen.service.call(
+                    call_context=binding.get_service_context(),
+                    service_name='ansible_mitogen.services.ContextService',
+                    method_name='reset',
+                    stack=ansible_mitogen.utils.unsafe.cast(list(stack)),
+                )
+            finally:
+                binding.close()
+        finally:
+            # Cleanup any monkey patching we did for `meta: reset_connection`
+            if self._action_monkey_patched_by_mitogen:
+                del self._action
+            del self._action_monkey_patched_by_mitogen
 
     # Compatibility with Ansible 2.4 wait_for_connection plug-in.
     _reset = reset
