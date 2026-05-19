@@ -536,7 +536,7 @@ class PlayContextSpec(Spec):
         return parse_python_path(
             interpreter_python,
             candidates=interpreter_python_fallback,
-            task_vars=self._task_vars,
+            task_vars=variables,
             action=self._action,
             rediscover_python=rediscover_python)
 
