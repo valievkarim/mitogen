@@ -280,6 +280,15 @@ def reopen_readonly(fp):
     os.close(fd)
 
 
+def get_umask():
+    """
+    Return the current process umask without changing it.
+    """
+    umask = os.umask(0)
+    os.umask(umask)
+    return umask
+
+
 class Runner(object):
     """
     Ansible module runner. After instantiation (with kwargs supplied by the
@@ -425,14 +434,21 @@ class Runner(object):
         :returns:
             Module result dictionary.
         """
-        self.setup()
-        if self.detach:
-            self.econtext.detach()
-
+        original_umask = get_umask()
         try:
-            return self._run()
+            self.setup()
+            if self.detach:
+                self.econtext.detach()
+
+            try:
+                return self._run()
+            finally:
+                try:
+                    os.umask(original_umask)
+                finally:
+                    self.revert()
         finally:
-            self.revert()
+            os.umask(original_umask)
 
 
 class AtExitWrapper(object):
